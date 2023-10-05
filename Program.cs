@@ -38,16 +38,6 @@ namespace WaTorSimulation
         {
             RemainingReproductionTime = Prey ? Constants.PreyReproductionTime : Constants.PredatorReproductionTime;
         }
-
-        public override string ToString()
-        {
-            string repr = $"Entity(Prey={Prey}, Coords={Coords}, RemainingReproductionTime={RemainingReproductionTime}";
-            if (EnergyValue.HasValue)
-            {
-                repr += $", EnergyValue={EnergyValue}";
-            }
-            return repr + ")";
-        }
     }
 
     public static class Constants
@@ -273,7 +263,7 @@ namespace WaTorSimulation
         ///    squares.If there are no free squares, no movement takes place.
         ///   2. Once a prey has survived a certain number of chronons it may reproduce.
         ///    This is done as it moves to a neighbouring square,
-        ///    leaving behind a new prey in its old position.
+        ///    leaving behind a new prey in its old surroundingPreyCoords.
         ///    Its reproduction time is also reset to zero.
         /// </summary>
         /// <param name="entity">The prey entity to perform actions for</param>
@@ -302,12 +292,45 @@ namespace WaTorSimulation
         /// <param name="occupiedByPreyCoords">List of positions that are occupied by prey for the predator to eat.</param>
         /// <param name="directionOrders">Ordered list (like priority queue) depicting
         /// order to attempt to move. Removes any systematic approach of checking neighbouring squares.</param>
-        public void PerformPredatorActions(Entity entity, List<Position> occupiedByPreyCoords, List<string> directionOrders)
+        public void PerformPredatorActions(Entity entity, Position? occupiedByPreyCoords, List<string> directionOrders)
         {
-               
+            int row = entity.Coords.Row;
+            int col = entity.Coords.Col;
+
+            // (3.) If the entity has 0 energy, it will die
+            if (entity.EnergyValue == 0)
+            {
+                this.Planet[row, col] = null;
+                return;
+            }
+
+            // (1.) Move to entity if possible
+            if (occupiedByPreyCoords != null)
+            {
+                // (5.) If it has survived the certain number of chronons it will also
+                // reproduce in this function
+                this.MoveAndReproduce(entity, directionOrders);
+            }
+            else
+            {
+                // Kill the prey
+                Entity prey = this.Planet[occupiedByPreyCoords.Row, occupiedByPreyCoords.Col];
+                prey.Alive = false;
+
+                // Move onto prey
+                this.Planet[occupiedByPreyCoords.Row, occupiedByPreyCoords.Col] = entity;
+                this.Planet[row, col] = null;
+
+                    entity.Coords = occupiedByPreyCoords;
+                    // (4.) Eats the prey and gains energy
+                    entity.EnergyValue += Constants.PredatorFoodValue;
+            }
+
+            entity.EnergyValue -= 1;
         }
 
         public void DisplayPlanet() {
+
         }
 
         /// <summary>
@@ -340,7 +363,15 @@ namespace WaTorSimulation
                         this.PerformPreyActions(entity, directions);
                     } else
                     {
+                        var surroundingPrey = this.GetSurroundingPrey(entity);
+                        Position? surroundingPreyCoords = null;
 
+                        if (surroundingPrey != null)
+                        {
+                            surroundingPreyCoords = surroundingPrey[0].Coords;   
+                        }
+
+                        this.PerformPredatorActions(entity, surroundingPreyCoords, directions);
                     }
                 }
 
