@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Security.Policy;
 
 namespace WaTorSimulation
 {
@@ -74,6 +72,8 @@ namespace WaTorSimulation
         public int Height { get; set; }
         public Entity[,] Planet { get; set; }
 
+        private static readonly Random rng = new Random();
+
         public WaTor(int width, int height)
         {
             Width = width;
@@ -134,12 +134,12 @@ namespace WaTorSimulation
         {
             while (true)
             {
-                int row = new Random().Next(0, this.Height - 1);
-                int column = new Random().Next(0, this.Width - 1);
-                Position position = new Position(row, column);
+                int row = rng.Next(0, this.Height - 1);
+                int column = rng.Next(0, this.Width - 1);
 
                 if (this.Planet[row, column] != null)
                 {
+                    Position position = new Position(row, column);
                     this.Planet[row, column] = new Entity(prey, position);
                     return;
                 }
@@ -153,6 +153,7 @@ namespace WaTorSimulation
         public void BalancePredatorsAndPrey()
         {
             var entities = this.GetEntities();
+            entities = entities.OrderBy(_ => rng.Next()).ToList();
 
             if (entities.Count >= Constants.MaxEntities - Constants.MaxEntities / 10)
             {
@@ -166,7 +167,8 @@ namespace WaTorSimulation
                 if (preyCount > predatorCount)
                 {
                     entitiesToPurge.AddRange(prey.Take(Constants.DeleteUnbalancedEntities));
-                } else
+                }
+                else
                 {
                     entitiesToPurge.AddRange(predators.Take(Constants.DeleteUnbalancedEntities));
                 }
@@ -197,7 +199,7 @@ namespace WaTorSimulation
             };
 
             var entities = new List<Entity>();
-            for (int i = 0; i < adjacent.GetLength(0); i ++)
+            for (int i = 0; i < adjacent.GetLength(0); i++)
             {
                 int r = adjacent[i, 0];
                 int c = adjacent[i, 1];
@@ -333,15 +335,16 @@ namespace WaTorSimulation
                 this.Planet[occupiedByPreyCoords.Value.Row, occupiedByPreyCoords.Value.Row] = entity;
                 this.Planet[row, col] = null;
 
-                    entity.Coords = occupiedByPreyCoords.Value;
-                    // (4.) Eats the prey and gains energy
-                    entity.EnergyValue += Constants.PredatorFoodValue;
+                entity.Coords = occupiedByPreyCoords.Value;
+                // (4.) Eats the prey and gains energy
+                entity.EnergyValue += Constants.PredatorFoodValue;
             }
 
             entity.EnergyValue -= 1;
         }
 
-        public void DisplayPlanet() {
+        public void DisplayPlanet()
+        {
 
         }
 
@@ -351,7 +354,7 @@ namespace WaTorSimulation
         /// <param name="iterationCount">Number of cronons (time intervals)</param>
         public void Run(int iterationCount)
         {
-            for (int cronon = 0;  cronon < iterationCount; cronon++)
+            for (int cronon = 0; cronon < iterationCount; cronon++)
             {
                 // Generate list of all entities in order to randomly
                 // pop an entity at a time to simulate true randomness
@@ -360,7 +363,7 @@ namespace WaTorSimulation
                 var entities = this.GetEntities();
 
                 // Perform either prey/predator actions on every entity in the planet
-                for (int _ = 0; _ <  entities.Count; _++)
+                for (int _ = 0; _ < entities.Count; _++)
                 {
                     // Randomly pick an entity and ensure it is alive
                     var entity = entities[_];
@@ -368,19 +371,23 @@ namespace WaTorSimulation
 
                     if (entity.Alive is false) continue;
 
-                    var directions = new List<string>(){ "N", "E", "S", "W" };
+                    var directions = new List<string>() { "N", "E", "S", "W" };
+                    directions = directions.OrderBy(__ => rng.Next()).ToList();
 
                     if (entity.Prey is true)
                     {
                         this.PerformPreyActions(entity, directions);
-                    } else
+                    }
+                    else
                     {
                         var surroundingPrey = this.GetSurroundingPrey(entity);
                         Position? surroundingPreyCoords = null;
 
                         if (surroundingPrey != null)
                         {
-                            surroundingPreyCoords = surroundingPrey[0].Coords;   
+                            // Shuffle the surrounding prey
+                            surroundingPrey = surroundingPrey.OrderBy(__ => rng.Next()).ToList();
+                            surroundingPreyCoords = surroundingPrey[0].Coords;
                         }
 
                         this.PerformPredatorActions(entity, surroundingPreyCoords, directions);

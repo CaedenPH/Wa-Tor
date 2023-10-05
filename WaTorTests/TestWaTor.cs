@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using WaTorSimulation;
 
@@ -15,7 +16,7 @@ namespace WaTorTests
             var entity = new Entity(true, new Position(0, 0));
 
             Assert.IsTrue(entity.Prey);
-            Assert.AreEqual(entity.Coords, new Position (0, 0));
+            Assert.AreEqual(entity.Coords, new Position(0, 0));
             Assert.IsTrue(entity.Alive);
             Assert.AreEqual(entity.RemainingReproductionTime, 5);
         }
@@ -26,7 +27,7 @@ namespace WaTorTests
             var entity = new Entity(false, new Position(0, 0));
 
             Assert.IsFalse(entity.Prey);
-            Assert.AreEqual(entity.Coords, new Position (0, 0));
+            Assert.AreEqual(entity.Coords, new Position(0, 0));
             Assert.IsTrue(entity.Alive);
             Assert.AreEqual(entity.RemainingReproductionTime, 20);
             Assert.AreEqual(entity.EnergyValue, 15);
@@ -83,7 +84,7 @@ namespace WaTorTests
         public void WaTorGetEntities_ReducesWhen_EntityDies()
         {
             WaTor waTor = new WaTor(Constants.Width, Constants.Height);
-            
+
         }
 
         [TestMethod]
@@ -91,8 +92,12 @@ namespace WaTorTests
         {
             WaTor waTor = new WaTor(Constants.Width, Constants.Height);
             waTor.AddEntity(true);
-
             waTor.AddEntity(false);
+            waTor.AddEntity(false);
+
+            Assert.AreEqual(Constants.PreyInitialCount + 1, waTor.GetEntities().Where(entity => entity.Prey).Count());
+            Assert.AreEqual(Constants.PredatorInitialCount + 2, waTor.GetEntities().Where(entity => entity.Prey != true).Count());
+
         }
 
         [TestMethod]
@@ -116,13 +121,72 @@ namespace WaTorTests
         public void WaTorGetSurroundPrey_GetsSurroundingPrey()
         {
             WaTor waTor = new WaTor(Constants.Width, Constants.Height);
-            
+            Entity predator = new Entity(false, new Position(1, 1));
+
+            Entity[,] planet =
+            {
+                { null, new Entity(true, new Position(0, 1)), null },
+                { null, predator, null },
+                { null, new Entity(true, new Position(2, 1)), null }
+            };
+
+            var surroundingPrey = waTor.GetSurroundingPrey(predator);
+            Assert.AreEqual(surroundingPrey, new List<Entity>() { new Entity(true, new Position(0, 1)),
+                new Entity(true, new Position(2, 1)) });
         }
 
         [TestMethod]
-        public void WaTorMoveAndReproduce()
+        public void WaTorMoveAndReproduce_DoesReproduce()
         {
             WaTor waTor = new WaTor(Constants.Width, Constants.Height);
+
+            Entity reproduceableEntity = new Entity(true, new Position(0, 0));
+            reproduceableEntity.RemainingReproductionTime = 0;
+
+            Entity[,] planet =
+            {
+                { reproduceableEntity, null }
+            };
+
+            waTor.SetPlanet(planet);
+            waTor.MoveAndReproduce(reproduceableEntity, new List<string>() { "E" });
+
+            Assert.AreEqual(waTor.Planet, new Entity[,] { { new Entity(true, new Position(0, 0)), reproduceableEntity } });
+        }
+
+        [TestMethod]
+        public void WaTorPerformPreyActions()
+        {
+
+        }
+
+        /// <summary>
+        /// Tests if a predator eats a prey
+        /// </summary>
+        [TestMethod]
+        public void WaTorPerformPredatorActions_EatsPrey()
+        {
+            WaTor waTor = new WaTor(Constants.Height, Constants.Width);
+            Entity predator = new Entity(true, new Position(0, 0));
+
+            Entity[,] planet =
+            {
+                { predator, new Entity(false, new Position(0, 1))}
+            };
+            waTor.SetPlanet(planet);
+            waTor.PerformPredatorActions(predator, new Position(0, 1), new List<string>());
+
+            Assert.AreEqual(waTor.Planet, new Entity[,] { { null, predator } });
+        }
+
+        [TestMethod]
+        public void WaTorRun_Entities_Change()
+        {
+            WaTor waTor = new WaTor(Constants.Height, Constants.Width);
+            waTor.Run(Constants.PredatorInitialEnergyValue - 1);
+
+            int predatorCount = waTor.GetEntities().Where(entity => entity.Prey != true).Count();
+            Assert.IsTrue(predatorCount >= Constants.PredatorInitialCount);
         }
     }
 }
