@@ -92,25 +92,16 @@ namespace WaTorSimulation
         }
 
         /// <summary>
-        /// Adds an entity, making sure the entity does not override another entity.
+        /// Ease of access for testing
         /// </summary>
-        /// <remarks>This function can iterate infinitely if there is not enough space on the Wa-Tor planet.</remarks>
-        /// <param name="prey">Whether the entity is prey or not</param>
-        public void AddEntity(bool prey)
+        /// <param name="planet">The planet to set</param>
+        public void SetPlanet(Entity[,] planet)
         {
-            while (true)
-            {
-                int row = new Random().Next(0, this.Height - 1);
-                int column = new Random().Next(0, this.Width - 1);
-                Position position = new Position(row, column);
-
-                if (this.Planet[row, column] != null)
-                {
-                    this.Planet[row, column] = new Entity(prey, position);
-                    return;
-                }
-            }
+            this.Planet = planet;
+            this.Width = planet.GetLength(0);
+            this.Height = planet.GetLength(1);
         }
+
 
         /// <summary>
         /// Returns a list of all the entities within the planet.
@@ -132,6 +123,27 @@ namespace WaTorSimulation
                 }
             }
             return entities;
+        }
+
+        /// <summary>
+        /// Adds an entity, making sure the entity does not override another entity.
+        /// </summary>
+        /// <remarks>This function can iterate infinitely if there is not enough space on the Wa-Tor planet.</remarks>
+        /// <param name="prey">Whether the entity is prey or not</param>
+        public void AddEntity(bool prey)
+        {
+            while (true)
+            {
+                int row = new Random().Next(0, this.Height - 1);
+                int column = new Random().Next(0, this.Width - 1);
+                Position position = new Position(row, column);
+
+                if (this.Planet[row, column] != null)
+                {
+                    this.Planet[row, column] = new Entity(prey, position);
+                    return;
+                }
+            }
         }
 
         /// <summary>
@@ -314,14 +326,14 @@ namespace WaTorSimulation
             else
             {
                 // Kill the prey
-                Entity prey = this.Planet[occupiedByPreyCoords.Row, occupiedByPreyCoords.Col];
+                Entity prey = this.Planet[occupiedByPreyCoords.Value.Row, occupiedByPreyCoords.Value.Row];
                 prey.Alive = false;
 
                 // Move onto prey
-                this.Planet[occupiedByPreyCoords.Row, occupiedByPreyCoords.Col] = entity;
+                this.Planet[occupiedByPreyCoords.Value.Row, occupiedByPreyCoords.Value.Row] = entity;
                 this.Planet[row, col] = null;
 
-                    entity.Coords = occupiedByPreyCoords;
+                    entity.Coords = occupiedByPreyCoords.Value;
                     // (4.) Eats the prey and gains energy
                     entity.EnergyValue += Constants.PredatorFoodValue;
             }
