@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Security.Policy;
+using System.Threading;
 
 namespace WaTorSimulation
 {
@@ -72,8 +75,6 @@ namespace WaTorSimulation
         public int Height { get; set; }
         public Entity[,] Planet { get; set; }
 
-        private static readonly Random rng = new Random();
-
         public WaTor(int width, int height)
         {
             Width = width;
@@ -81,27 +82,36 @@ namespace WaTorSimulation
             Planet = new Entity[Height, Width];
 
             // Populate planet with predators and prey randomly
-            for (int i = 0; i > Constants.PreyInitialCount; i++)
+            for (int i = 0; i < Constants.PreyInitialCount; i++)
             {
                 this.AddEntity(true);
             }
-            for (int i = 0; i > Constants.PreyInitialCount; i++)
+            for (int i = 0; i < Constants.PredatorInitialCount; i++)
             {
                 this.AddEntity(false);
             }
         }
 
         /// <summary>
-        /// Ease of access for testing
+        /// Adds an entity, making sure the entity does not override another entity.
         /// </summary>
-        /// <param name="planet">The planet to set</param>
-        public void SetPlanet(Entity[,] planet)
+        /// <remarks>This function can iterate infinitely if there is not enough space on the Wa-Tor planet.</remarks>
+        /// <param name="prey">Whether the entity is prey or not</param>
+        public void AddEntity(bool prey)
         {
-            this.Planet = planet;
-            this.Width = planet.GetLength(0);
-            this.Height = planet.GetLength(1);
-        }
+            while (true)
+            {
+                int row = new Random().Next(0, this.Height - 1);
+                int column = new Random().Next(0, this.Width - 1);
+                Position position = new Position(row, column);
 
+                if (this.Planet[row, column] == null)
+                {
+                    this.Planet[row, column] = new Entity(prey, position);
+                    return;
+                }
+            }
+        }
 
         /// <summary>
         /// Returns a list of all the entities within the planet.
@@ -126,34 +136,12 @@ namespace WaTorSimulation
         }
 
         /// <summary>
-        /// Adds an entity, making sure the entity does not override another entity.
-        /// </summary>
-        /// <remarks>This function can iterate infinitely if there is not enough space on the Wa-Tor planet.</remarks>
-        /// <param name="prey">Whether the entity is prey or not</param>
-        public void AddEntity(bool prey)
-        {
-            while (true)
-            {
-                int row = rng.Next(0, this.Height - 1);
-                int column = rng.Next(0, this.Width - 1);
-
-                if (this.Planet[row, column] != null)
-                {
-                    Position position = new Position(row, column);
-                    this.Planet[row, column] = new Entity(prey, position);
-                    return;
-                }
-            }
-        }
-
-        /// <summary>
         /// Balances predators and preys so that prey can not dominate the predators
         /// by blocking up space for them to reproduce.
         /// </summary>
         public void BalancePredatorsAndPrey()
         {
             var entities = this.GetEntities();
-            entities = entities.OrderBy(_ => rng.Next()).ToList();
 
             if (entities.Count >= Constants.MaxEntities - Constants.MaxEntities / 10)
             {
@@ -167,8 +155,7 @@ namespace WaTorSimulation
                 if (preyCount > predatorCount)
                 {
                     entitiesToPurge.AddRange(prey.Take(Constants.DeleteUnbalancedEntities));
-                }
-                else
+                } else
                 {
                     entitiesToPurge.AddRange(predators.Take(Constants.DeleteUnbalancedEntities));
                 }
@@ -199,7 +186,7 @@ namespace WaTorSimulation
             };
 
             var entities = new List<Entity>();
-            for (int i = 0; i < adjacent.GetLength(0); i++)
+            for (int i = 0; i < adjacent.GetLength(0); i ++)
             {
                 int r = adjacent[i, 0];
                 int c = adjacent[i, 1];
@@ -306,7 +293,7 @@ namespace WaTorSimulation
         /// <param name="occupiedByPreyCoords">List of positions that are occupied by prey for the predator to eat.</param>
         /// <param name="directionOrders">Ordered list (like priority queue) depicting
         /// order to attempt to move. Removes any systematic approach of checking neighbouring squares.</param>
-        public void PerformPredatorActions(Entity entity, Position? occupiedByPreyCoords, List<string> directionOrders)
+        public void PerformPredatorActions(Entity entity, List<string> directionOrders, Position? occupiedByPreyCoords)
         {
             int row = entity.Coords.Row;
             int col = entity.Coords.Col;
@@ -321,31 +308,65 @@ namespace WaTorSimulation
             // (1.) Move to entity if possible
             if (occupiedByPreyCoords != null)
             {
-                // (5.) If it has survived the certain number of chronons it will also
-                // reproduce in this function
-                this.MoveAndReproduce(entity, directionOrders);
-            }
-            else
-            {
                 // Kill the prey
-                Entity prey = this.Planet[occupiedByPreyCoords.Value.Row, occupiedByPreyCoords.Value.Row];
+                Entity prey = this.Planet[occupiedByPreyCoords.Value.Row, occupiedByPreyCoords.Value.Col];
                 prey.Alive = false;
 
                 // Move onto prey
-                this.Planet[occupiedByPreyCoords.Value.Row, occupiedByPreyCoords.Value.Row] = entity;
+                this.Planet[occupiedByPreyCoords.Value.Row, occupiedByPreyCoords.Value.Col] = entity;
                 this.Planet[row, col] = null;
 
                 entity.Coords = occupiedByPreyCoords.Value;
                 // (4.) Eats the prey and gains energy
                 entity.EnergyValue += Constants.PredatorFoodValue;
             }
-
+            else
+            {
+                // (5.) If it has survived the certain number of chronons it will also
+                // reproduce in this function
+                this.MoveAndReproduce(entity, directionOrders);
+            }
             entity.EnergyValue -= 1;
         }
 
-        public void DisplayPlanet()
-        {
+        /// <summary>
+        /// Visually displays the Wa-Tor planet using colour in terminal to clear and re-print the Wa-Tor planet at intervals.
+        /// </summary>
+        public void DisplayPlanet(int iteration) {
+            Console.Clear();
 
+            for (int i = 0; i < this.Planet.GetLength(0); i ++)
+            {
+                for (int j = 0; j < this.Planet.GetLength(1); j ++)
+                {
+                    Console.ResetColor();
+                    Entity entity = this.Planet[i, j];
+                    if (entity is null)
+                    {
+                        Console.Write(" . ");
+                    } else
+                    {
+                        if (entity.Prey)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Blue;
+                            Console.Write(" # ");
+                        }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.Write(" x ");
+                        }
+                    }
+                }
+                Console.WriteLine();
+            }
+
+            var entities = this.GetEntities();
+            int preyCount = entities.Where(entity => entity.Prey).ToList().Count;
+            int predatorCount = entities.Count - preyCount;
+
+            Console.WriteLine($"Iteration: {iteration} | Prey count: {preyCount} | Predator count: {predatorCount}");
+            Thread.Sleep(50);
         }
 
         /// <summary>
@@ -354,7 +375,7 @@ namespace WaTorSimulation
         /// <param name="iterationCount">Number of cronons (time intervals)</param>
         public void Run(int iterationCount)
         {
-            for (int cronon = 0; cronon < iterationCount; cronon++)
+            for (int cronon = 0;  cronon < iterationCount; cronon++)
             {
                 // Generate list of all entities in order to randomly
                 // pop an entity at a time to simulate true randomness
@@ -363,7 +384,7 @@ namespace WaTorSimulation
                 var entities = this.GetEntities();
 
                 // Perform either prey/predator actions on every entity in the planet
-                for (int _ = 0; _ < entities.Count; _++)
+                for (int _ = 0; _ <  entities.Count; _++)
                 {
                     // Randomly pick an entity and ensure it is alive
                     var entity = entities[_];
@@ -371,31 +392,27 @@ namespace WaTorSimulation
 
                     if (entity.Alive is false) continue;
 
-                    var directions = new List<string>() { "N", "E", "S", "W" };
-                    directions = directions.OrderBy(__ => rng.Next()).ToList();
+                    var directions = new List<string>(){ "N", "E", "S", "W" };
 
                     if (entity.Prey is true)
                     {
                         this.PerformPreyActions(entity, directions);
-                    }
-                    else
+                    } else
                     {
                         var surroundingPrey = this.GetSurroundingPrey(entity);
                         Position? surroundingPreyCoords = null;
 
-                        if (surroundingPrey != null)
+                        if (surroundingPrey.Count > 0)
                         {
-                            // Shuffle the surrounding prey
-                            surroundingPrey = surroundingPrey.OrderBy(__ => rng.Next()).ToList();
-                            surroundingPreyCoords = surroundingPrey[0].Coords;
+                            surroundingPreyCoords = surroundingPrey[0].Coords;   
                         }
 
-                        this.PerformPredatorActions(entity, surroundingPreyCoords, directions);
+                        this.PerformPredatorActions(entity, directions, surroundingPreyCoords);
                     }
                 }
 
                 this.BalancePredatorsAndPrey();
-                this.DisplayPlanet();
+                this.DisplayPlanet(cronon);
             }
         }
     }
