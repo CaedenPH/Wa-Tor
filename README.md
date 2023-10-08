@@ -1,6 +1,7 @@
 ## Wa-Tor Algorithm
 
-![](https://beltoforion.de/en/wator/images/wator_medium.webm)
+[c-sharp-wa-tor.webm](https://github.com/CaedenPH/Wa-Tor/assets/23421705/5446cfc9-c48d-450c-9325-138b09acbce1)
+
 
 Wa-Tor is a population dynamics simulation devised by A. K. Dewdney. It is usually implemented as a two-dimensional grid with three colours, one for fish, one for sharks and one for empty water. The sharks are predatory and eat the fish. Both sharks and fish live, move, reproduce and die in Wa-Tor according to the simple rules defined below. From these simple rules, complex emergent behavior can be seen to arise.
 
