@@ -444,7 +444,6 @@ namespace WaTorSimulation
     {
         static void Main(string[] args)
         {
-            Thread.Sleep(10000);
             WaTor waTor = new WaTor(Constants.Width, Constants.Height);
             waTor.Run(100_000);
         }
